@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Endless Runner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #00f3ff;
+            --secondary-color: #bc13fe;
+            --bg-color: #0a0a12;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Orbitron', sans-serif;
+            color: white;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            max-width: 100%;
+            height: 400px;
+            max-height: 100vh; 
+            aspect-ratio: 2/1; /* Maintain aspect ratio */
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        @media (max-width: 600px) {
+            #game-container {
+                width: 100%;
+                height: 50vw; /* Keep 2:1 ratio generally */
+                border-radius: 0;
+            }
+            h1 { font-size: 32px; }
+            .btn { padding: 10px 30px; font-size: 14px; }
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none; /* remove focus outline */
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .score-board {
+            font-size: 24px;
+            text-shadow: 0 0 10px var(--primary-color);
+            z-index: 10;
+        }
+
+        .high-score-display {
+             font-size: 18px;
+             color: #aaa;
+             margin-top: 5px;
+        }
+        
+        .new-record {
+            color: #ff0;
+            animation: blink 0.5s infinite alternate;
+        }
+
+        @keyframes blink {
+            from { text-shadow: 0 0 10px #ff0; opacity: 1; }
+            to { text-shadow: 0 0 20px #ff0; opacity: 0.7; }
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 20;
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        /* Scanline Overlay */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            z-index: 5;
+            opacity: 0.3;
+        }
+        
+
+
+        h1 {
+            font-size: 48px;
+            margin: 0 0 20px 0;
+            text-align: center;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: var(--primary-color);
+            color: black;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.6);
+            transform: scale(1.05);
+        }
+
+        .end-stats {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .end-stats p {
+            margin: 10px 0;
+            font-size: 20px;
+        }
+
+        .pause-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--primary-color);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        
+        .pause-btn:hover {
+            background: var(--primary-color);
+            color: black;
+            box-shadow: 0 0 15px var(--primary-color);
+            transform: scale(1.1);
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="scanlines"></div>
+    
+    <div class="ui-layer">
+        <div class="top-left">
+            <div class="score-board">SCORE: <span id="scoreVal">0</span></div>
+            <div class="high-score-display">HIGH SCORE: <span id="uiHighScore">0</span></div>
+        </div>
+        <button id="pauseBtn" class="pause-btn" style="display: none;">||</button>
+        <div class="controls-hint">Press UP or TAP to Jump</div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen" class="screen active">
+        <h1>Endless Runner</h1>
+        <button id="startBtn" class="btn">Start Run</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="screen">
+        <h1>GAME OVER</h1>
+        <div class="end-stats">
+            <p>Score: <span id="finalScore">0</span></p>
+            <p id="newRecordMsg" class="new-record" style="display: none;">NEW HIGH SCORE!</p>
+        </div>
+        <button id="restartBtn_GO" class="btn">Restart</button>
+    </div>
+
+    <!-- Pause Screen -->
+    <div id="pauseScreen" class="screen">
+        <h1>PAUSED</h1>
+        <button id="resumeBtn" class="btn">Resume</button>
+        <button id="restartBtn_Pause" class="btn">Restart</button>
+        
+        <div class="custom-music-control" style="margin-top: 20px;">
+            <label for="bgmInput" class="btn" style="font-size: 14px; padding: 10px 20px; width: 200px; margin: 5px;">Upload Custom Music 🎵</label>
+            <input type="file" id="bgmInput" accept="audio/*" style="display: none;" onchange="handleCustomMusic(this)">
+            
+            <label for="crashInput" class="btn" style="font-size: 14px; padding: 10px 20px; width: 200px; margin: 5px;">Upload Crash Sound 💥</label>
+            <input type="file" id="crashInput" accept="audio/*" style="display: none;" onchange="handleCustomCrash(this)">
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global Error Handler to catch "static" game issues
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+        alert("Game Error: " + msg + "\nLine: " + lineNo);
+        return false;
+    };
+
+    /** @type {HTMLCanvasElement} */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- GAME STATE VARIABLES (Moved to top to fix ReferenceError) ---
+    let gameState = 'START'; 
+    let frame = 0;
+    let score = 0;
+    let highScore = localStorage.getItem('neonRunnerHighScore') || 0;
+    let gameSpeed = 5;
+    let spawnTimer = 0;
+    let screenShake = 0;
+    let warningOpacity = 0; 
+    let speedModeTriggered = false;
+    let tintModeTriggered = false;
+    
+    // Core Objects (Lazy Init)
+    let player;
+    let traffic;
+    let obstacles = [];
+    let orbs = [];
+    let floatTexts = [];
+    let particles = [];
+    let keys = {};
+    
+    // Background Stars
+    const stars = [];
+    // We can't use canvas.width yet because it might strictly be 0 or default, 
+    // but we can just init them and they will be drawn
+    // Better yet, let's just push them.
+    for(let i=0; i<50; i++) {
+        stars.push({
+            x: Math.random() * 800, // Default width assumption
+            y: Math.random() * 400,
+            size: Math.random() * 2,
+            speed: Math.random() * 0.5 + 0.1
+        });
+    }
+    
+    // Set actual canvas size (resolution independent)
+    // Dynamic Resizing now handled below
+    
+    // Game Constants
+    const GRAVITY = 0.6;
+    const JUMP_FORCE = -12;
+    // START DYNAMIC
+    let GROUND_Y = 340;
+    // END DYNAMIC
+    const SPAWN_INTERVAL_BASE = 100;
+    const ORB_SPAWN_RATE = 60; 
+    
+    // Resize Handler
+    function resizeGame() {
+        const container = document.getElementById('game-container');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        GROUND_Y = canvas.height - 60; // Keep ground relative to bottom
+        
+        // Redraw immediately if paused/stopped
+        if (gameState !== 'PLAY') draw();
+    }
+    
+    window.addEventListener('resize', resizeGame);
+    // Initial call
+    window.onload = () => {
+        resizeGame();
+        // Ensure initial draw
+        if (gameState === 'START') draw();
+    };
+    resizeGame(); // Also call immediately just in case 
+    
+    // Advanced Audio System
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    class AudioController {
+        constructor() {
+            this.bgmOscillators = [];
+            this.bgmGain = null;
+            this.isMuted = false;
+            this.bgmInterval = null;
+            this.beatCount = 0;
+            
+            // Custom Audio
+            this.customBgmNode = null;
+            this.customBgmBuffer = null;
+            this.usingCustomBgm = false;
+            
+            this.customCrashBuffer = null;
+        }
+
+        init() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            this.stopBGM();
+        }
+        
+        setCustomBgm(arrayBuffer) {
+            audioCtx.decodeAudioData(arrayBuffer, (buffer) => {
+                this.customBgmBuffer = buffer;
+                this.usingCustomBgm = true;
+                // If currently playing, restart with new track
+                if (gameState === 'PLAY') {
+                    this.startBGM(); 
+                }
+            });
+        }
+        
+        setCustomCrash(arrayBuffer) {
+            audioCtx.decodeAudioData(arrayBuffer, (buffer) => {
+                this.customCrashBuffer = buffer;
+            });
+        }
+
+        // Helper: Create a buffer with white noise for explosions
+        createNoiseBuffer() {
+            const bufferSize = audioCtx.sampleRate * 2; // 2 seconds
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        playTone(freq, type, duration, vol = 0.1, slideTo = null) {
+            if (this.isMuted) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            if (slideTo) {
+                osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+            }
+            
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        jump() {
+            // "Mario-style" Jump: Rapid frequency slide up
+            this.playTone(150, 'square', 0.15, 0.15, 600);
+        }
+
+        score() {
+            // "Coin" Sound: Two rapid high pitched tones
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(987.77, now); // B5
+            osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+            
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.linearRampToValueAtTime(0.1, now + 0.08);
+            gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+            
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+
+        crash() {
+            if (this.isMuted) return;
+
+            // Custom Crash Sound
+            if (this.customCrashBuffer) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = this.customCrashBuffer;
+                const gain = audioCtx.createGain();
+                gain.gain.value = 0.5; // Balanced Medium Volume
+                source.connect(gain);
+                gain.connect(audioCtx.destination);
+                source.start();
+                return;
+            }
+
+            const now = audioCtx.currentTime;
+
+            // 1. IMPACT NOISE (The "Crunch")
+            const noiseBuffer = this.createNoiseBuffer();
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            
+            const noiseGain = audioCtx.createGain();
+            noiseSrc.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            
+            // Balanced volume (0.5)
+            noiseGain.gain.setValueAtTime(0.5, now); 
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            noiseSrc.start(now);
+            noiseSrc.stop(now + 0.5);
+
+            // 2. SUB-BASS DROP (The "Thud")
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+            
+            osc.type = 'triangle'; 
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+            
+            // Balanced volume (0.5)
+            oscGain.gain.setValueAtTime(0.5, now); 
+            oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            
+            osc.start(now);
+            osc.stop(now + 0.4);
+        }
+        
+        start() {
+            // Start Game Jingle
+            this.playTone(440, 'triangle', 0.1, 0.2);
+            setTimeout(() => this.playTone(554, 'triangle', 0.1, 0.2), 100);
+            setTimeout(() => this.playTone(659, 'triangle', 0.2, 0.2), 200);
+            this.startBGM();
+        }
+
+        // Simple Background Music Loop
+        startBGM() {
+            this.stopBGM();
+            
+            if (this.usingCustomBgm && this.customBgmBuffer) {
+                // Play Custom Track
+                this.customBgmNode = audioCtx.createBufferSource();
+                this.customBgmNode.buffer = this.customBgmBuffer;
+                this.customBgmNode.loop = true;
+                
+                const gain = audioCtx.createGain();
+                gain.gain.value = 0.5; // Balanced Medium Volume
+                
+                this.customBgmNode.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                this.customBgmNode.start();
+                return;
+            }
+            
+            // Default Procedural Beat
+            let bar = 0;
+            // 120 BPM = 500ms per beat, 16th notes = 125ms
+            this.bgmInterval = setInterval(() => {
+                const time = audioCtx.currentTime;
+                
+                // Bassline (Kick-ish)
+                if (bar % 4 === 0) {
+                    this.playTone(100, 'sine', 0.1, 0.3, 50); // Kick
+                }
+                
+                // Hi-Hat
+                if (bar % 2 === 0) {
+                    // Short burst of high pitched noise or high square
+                    this.playTone(8000, 'square', 0.05, 0.05);
+                }
+
+                // Synth Bass Melody
+                if (bar % 8 === 0) this.playTone(220, 'sawtooth', 0.2, 0.05); // A3
+                if (bar % 8 === 2) this.playTone(220, 'sawtooth', 0.2, 0.05); // A3
+                if (bar % 8 === 4) this.playTone(261, 'sawtooth', 0.2, 0.05); // C4
+                if (bar % 8 === 6) this.playTone(196, 'sawtooth', 0.2, 0.05); // G3
+
+                bar++;
+            }, 125); // 16th notes at ~120BPM
+        }
+
+        stopBGM() {
+            if (this.bgmInterval) {
+                clearInterval(this.bgmInterval);
+                this.bgmInterval = null;
+            }
+            // Stop custom music if playing
+            if (this.customBgmNode) {
+                try {
+                    this.customBgmNode.stop();
+                } catch(e) {}
+                this.customBgmNode = null;
+            }
+        }
+    }
+
+    const Sound = new AudioController();
+
+
+
+    // DOM Elements
+    const scoreEl = document.getElementById('scoreVal');
+    const uiHighScoreEl = document.getElementById('uiHighScore');
+    const finalScoreEl = document.getElementById('finalScore');
+    const newRecordMsg = document.getElementById('newRecordMsg');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const pauseScreen = document.getElementById('pauseScreen');
+    const pauseBtn = document.getElementById('pauseBtn');
+
+    uiHighScoreEl.innerText = Math.floor(highScore);
+
+
+    // Background Elements
+    class Traffic {
+        constructor() {
+            this.cars = [];
+        }
+        
+        update() {
+            if (frame % 30 === 0) {
+                // Spawn a car
+                this.cars.push({
+                    x: -100,
+                    y: Math.random() * 200 + 50,
+                    w: Math.random() * 60 + 20,
+                    speed: Math.random() * 5 + 2,
+                    color: Math.random() < 0.5 ? '#ff0055' : '#00f3ff'
+                });
+            }
+            
+            this.cars.forEach((car, index) => {
+                car.x += car.speed + (gameSpeed * 0.2); // Parallax-ish
+                if (car.x > canvas.width + 100) this.cars.splice(index, 1);
+            });
+        }
+        
+        draw() {
+            ctx.shadowBlur = 10;
+            this.cars.forEach(car => {
+                ctx.fillStyle = car.color;
+                ctx.shadowColor = car.color;
+                ctx.fillRect(car.x, car.y, car.w, 3);
+            });
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    // Entities
+    class Orb {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.size = 10;
+            this.collected = false;
+            this.pulse = 0;
+            this.type = Math.random() < 0.1 ? 'gold' : 'normal'; // 10% chance for super orb
+        }
+
+        update() {
+            this.x -= gameSpeed;
+            this.pulse += 0.1;
+        }
+
+        draw() {
+            if (this.collected) return;
+            
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            // Glow effect
+            const glowSize = Math.sin(this.pulse) * 5 + 10;
+            ctx.shadowBlur = glowSize;
+            ctx.shadowColor = this.type === 'gold' ? '#ffdf00' : '#00f3ff';
+            
+            // Core
+            ctx.fillStyle = this.type === 'gold' ? '#fff' : '#e0ffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size/2, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Outer ring
+            ctx.strokeStyle = this.type === 'gold' ? '#ffdf00' : '#00f3ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size, 0, Math.PI*2);
+            ctx.stroke();
+
+            ctx.restore();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    class FloatingText {
+        constructor(x, y, text, color) {
+            this.x = x;
+            this.y = y;
+            this.text = text;
+            this.color = color;
+            this.life = 1.0;
+            this.dy = -1;
+        }
+        update() {
+            this.y += this.dy;
+            this.life -= 0.02;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.fillStyle = this.color;
+            ctx.font = "bold 16px Orbitron";
+            ctx.fillText(this.text, this.x, this.y);
+            ctx.restore();
+        }
+    }
+
+    class Player {
+        constructor() {
+            this.width = 40;
+            this.height = 50; // Slightly taller for human proportions
+            this.x = 100;
+            this.y = GROUND_Y - this.height;
+            this.dy = 0;
+            this.jumpTimer = 0;
+            this.isGrounded = true;
+            this.jumpCount = 0; // For double jump
+            this.maxJumps = 2;
+            this.color = '#00f3ff';
+            this.animFrame = 0;
+        }
+
+        update() {
+            // Jump Logic
+            if (keys['ArrowUp'] && !keys['ArrowUpPresed']) {
+                if (this.isGrounded || this.jumpCount < this.maxJumps) {
+                    this.dy = JUMP_FORCE;
+                    this.isGrounded = false;
+                    this.jumpCount++;
+                    
+                    // FX
+                    createParticles(this.x + this.width/2, this.y + this.height, 10, '#fff');
+                    Sound.jump();
+                    
+                    if (this.jumpCount > 1) {
+                         // Double jump spin/visual cue
+                         createParticles(this.x + this.width/2, this.y + this.height/2, 15, '#00f3ff');
+                    }
+                }
+                keys['ArrowUpPresed'] = true; // Debounce hook logic
+            }
+            if (!keys['ArrowUp']) keys['ArrowUpPresed'] = false;
+            
+            // Gravity
+            this.dy += GRAVITY;
+            this.y += this.dy;
+
+            // Ground Collision
+            if (this.y + this.height > GROUND_Y) {
+                this.y = GROUND_Y - this.height;
+                this.dy = 0;
+                this.isGrounded = true;
+                this.jumpCount = 0; // Reset jumps
+                
+                // Landing effect
+                if (!this.wasGrounded) {
+                     createParticles(this.x + this.width/2, this.y + this.height, 5, this.color);
+                }
+            }
+            this.wasGrounded = this.isGrounded;
+            
+            if (this.isGrounded && gameState === 'PLAY') {
+                this.animFrame += 0.2;
+            } else {
+                this.animFrame = 0.5; // Fixed pose in air
+            }
+        }
+
+        draw() {
+            const centerX = this.x + this.width / 2;
+            const bottomY = this.y + this.height;
+            const headY = this.y + 7;
+            
+            // Animation Math
+            const cycle = this.animFrame;
+            
+            // Theme Colors
+            const skinColor = '#f5cca9'; // Light skin tone
+            const hairColor = '#2c3e50'; // Dark brown/black
+            const shirtColor = '#e74c3c'; // Red T-Shirt
+            const pantsColor = '#34495e'; // Navy Jeans
+            const shoeColor = '#bdc3c7'; // Grey sneakers
+            
+            ctx.shadowBlur = 0;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // --- HELPER FUNCTIONS ---
+            const drawLimb = (x1, y1, x2, y2, color, width) => {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            };
+
+            // Calculate Joint Positions
+            const shoulderY = headY + 10;
+            const hipY = headY + 28;
+            
+            // --- DRAW LEGS (Back first for depth) ---
+            let lLegAngle = this.isGrounded ? Math.sin(cycle) : -0.5;
+            let lKneeX = centerX + (lLegAngle * 8);
+            let lKneeY = hipY + 14;
+            let lFootX = lKneeX + (lLegAngle * 8);
+            let lFootY = bottomY - 2 - (this.isGrounded ? Math.abs(Math.sin(cycle) * 8) : 0);
+
+            // Left Thigh
+            drawLimb(centerX, hipY, lKneeX, lKneeY, '#2c3e50', 7); 
+            // Left Calf
+            drawLimb(lKneeX, lKneeY, lFootX, lFootY, '#2c3e50', 6);
+            // Left Shoe
+            ctx.fillStyle = '#95a5a6';
+            ctx.beginPath();
+            ctx.ellipse(lFootX + 2, lFootY + 2, 5, 3, 0, 0, Math.PI*2);
+            ctx.fill();
+
+
+            // --- DRAW ARMS (Back) ---
+            let lArmAngle = this.isGrounded ? Math.cos(cycle) : -2; 
+            let lElbowX = centerX + (lArmAngle * 10);
+            let lElbowY = shoulderY + 12;
+            let lHandX = lElbowX + (lArmAngle * 8);
+            let lHandY = lElbowY + 10;
+
+            // Left Upper Arm (Sleeve)
+            drawLimb(centerX, shoulderY, lElbowX, lElbowY, '#c0392b', 6); // Darker red sleeve
+            // Left Forearm (Skin)
+            drawLimb(lElbowX, lElbowY, lHandX, lHandY, '#e0b493', 5); // Darker skin
+            // Left Hand
+            ctx.fillStyle = '#e0b493';
+            ctx.beginPath();
+            ctx.arc(lHandX, lHandY, 3, 0, Math.PI*2);
+            ctx.fill();
+
+
+            // --- TORSO ---
+            ctx.fillStyle = shirtColor;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 6, shoulderY - 5);
+            ctx.lineTo(centerX + 8, shoulderY - 5); // Shoulders
+            ctx.lineTo(centerX + 6, hipY); // Waist Right
+            ctx.lineTo(centerX - 6, hipY); // Waist Left
+            ctx.fill();
+
+
+            // --- DRAW LEGS (Front) ---
+            let rLegAngle = this.isGrounded ? Math.sin(cycle + Math.PI) : 1.0;
+            let rKneeX = centerX + (rLegAngle * 8);
+            let rKneeY = hipY + 14;
+            let rFootX = rKneeX + (rLegAngle * 8);
+            let rFootY = bottomY - 2 - (this.isGrounded ? Math.abs(Math.sin(cycle + Math.PI) * 8) : 8);
+
+            // Right Thigh
+            drawLimb(centerX, hipY, rKneeX, rKneeY, pantsColor, 7);
+            // Right Calf
+            drawLimb(rKneeX, rKneeY, rFootX, rFootY, pantsColor, 6);
+            // Right Shoe
+            ctx.fillStyle = shoeColor;
+            ctx.beginPath();
+            ctx.ellipse(rFootX + 2, rFootY + 2, 5, 3, 0, 0, Math.PI*2);
+            ctx.fill();
+
+
+            // --- HEAD & FACE ---
+            // Neck
+            ctx.fillStyle = skinColor;
+            ctx.fillRect(centerX - 2, headY + 3, 5, 6);
+            
+            // Face Shape
+            ctx.beginPath();
+            ctx.arc(centerX + 1, headY, 7, 0, Math.PI * 2); 
+            ctx.fill();
+            
+            // Hair (Spiky Style)
+            ctx.fillStyle = hairColor;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 6, headY - 2);
+            ctx.lineTo(centerX - 4, headY - 8);
+            ctx.lineTo(centerX, headY - 6);
+            ctx.lineTo(centerX + 4, headY - 9);
+            ctx.lineTo(centerX + 7, headY - 2);
+            ctx.lineTo(centerX + 7, headY + 2); // Sideburns
+            ctx.lineTo(centerX + 3, headY - 3); // Hairline
+            ctx.lineTo(centerX - 6, headY - 2);
+            ctx.fill();
+
+            // Eye (Dot)
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(centerX + 4, headY - 1, 1, 0, Math.PI*2);
+            ctx.fill();
+
+
+            // --- DRAW ARMS (Front) ---
+            let rArmAngle = this.isGrounded ? Math.cos(cycle + Math.PI) : 2;
+            let rElbowX = centerX + (rArmAngle * 10);
+            let rElbowY = shoulderY + 12;
+            let rHandX = rElbowX + (rArmAngle * 8);
+            let rHandY = rElbowY + 10;
+
+            // Right Upper Arm (Sleeve)
+            drawLimb(centerX, shoulderY, rElbowX, rElbowY, shirtColor, 6);
+            // Right Forearm (Skin)
+            drawLimb(rElbowX, rElbowY, rHandX, rHandY, skinColor, 5);
+             // Right Hand
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.arc(rHandX, rHandY, 3, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.restore(); // Restore context
+        }
+    }
+
+    class Obstacle {
+        constructor(x, width, height, type) {
+            this.x = x;
+            this.width = width;
+            this.height = height;
+            this.type = type; // 'box' or 'spike'
+            this.markedForDeletion = false;
+        }
+
+        update() {
+            this.x -= gameSpeed;
+            if (this.x + this.width < 0) this.markedForDeletion = true;
+        }
+
+        draw() {
+            ctx.shadowBlur = 15;
+
+            if (this.type === 'box') {
+                ctx.shadowColor = '#bc13fe';
+                ctx.fillStyle = '#bc13fe';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Detail
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(this.x + 4, this.y + 4, this.width - 8, this.height - 8);
+                // Inner color
+                ctx.fillStyle = '#bc13fe';
+                ctx.fillRect(this.x + 8, this.y + 8, this.width - 16, this.height - 16);
+            } else {
+                // Triangle/Spike - Red for Danger
+                ctx.shadowColor = '#ff3300';
+                ctx.fillStyle = '#ff3300';
+                
+                ctx.beginPath();
+                ctx.moveTo(this.x, GROUND_Y);
+                ctx.lineTo(this.x + this.width / 2, GROUND_Y - this.height);
+                ctx.lineTo(this.x + this.width, GROUND_Y);
+                ctx.closePath();
+                ctx.fill();
+
+                // Simple highlight for depth
+                ctx.fillStyle = '#ff6633';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width/2, GROUND_Y - this.height);
+                ctx.lineTo(this.x + this.width, GROUND_Y);
+                ctx.lineTo(this.x + this.width/2, GROUND_Y);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+        }
+        
+        get y() {
+            return GROUND_Y - this.height;
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.size = Math.random() * 3 + 1;
+            this.speedX = Math.random() * 2 - 1;
+            this.speedY = Math.random() * -2 - 1; 
+            this.color = color;
+            this.life = 1;
+            this.decay = Math.random() * 0.03 + 0.02;
+        }
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            this.life -= this.decay;
+        }
+        draw() {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.size, this.size);
+            ctx.globalAlpha = 1;
+        }
+    }
+
+
+
+    // Initialize Objects
+    player = new Player();
+    traffic = new Traffic(); 
+
+    // Input Handling
+    window.addEventListener('keydown', e => {
+        if (e.code === 'Space' || e.code === 'ArrowUp') {
+            e.preventDefault(); 
+        }
+        if (e.code === 'Space' || e.code === 'KeyP' || e.code === 'Escape') {
+            togglePause();
+        }
+        keys[e.code] = true;
+    });
+    
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    // Touch Support
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keys['ArrowUp'] = true;
+    }, {passive: false});
+    
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        keys['ArrowUp'] = false;
+    }, {passive: false});
+
+    function createParticles(x, y, count, color) {
+        for(let i=0; i<count; i++) {
+            particles.push(new Particle(x, y, color));
+        }
+    }
+
+    function spawnObstacle() {
+        spawnTimer--;
+        
+        if (spawnTimer <= 0) {
+            let type = Math.random() < 0.5 ? 'box' : 'spike';
+            let width = 30 + Math.random() * 20;
+            let height = 30 + Math.random() * 30;
+             if (type === 'spike') {
+                 width = 40; 
+                 height = 40; 
+             }
+
+            obstacles.push(new Obstacle(canvas.width, width, height, type));
+            spawnTimer = SPAWN_INTERVAL_BASE - Math.min(score * 0.1, 60) + Math.random() * 30; 
+        }
+    }
+
+    let isLoopRunning = false;
+    
+    function resetGame() {
+        document.activeElement.blur();
+        
+        player = new Player();
+        traffic = new Traffic();
+        obstacles = [];
+        orbs = [];
+        floatTexts = [];
+        particles = [];
+        score = 0;
+        
+        speedModeTriggered = false;
+        tintModeTriggered = false;
+        
+        gameSpeed = 5;
+        spawnTimer = 0;
+        gameState = 'PLAY';
+        scoreEl.innerText = '0';
+        
+        startScreen.classList.remove('active');
+        gameOverScreen.classList.remove('active');
+        pauseScreen.classList.remove('active');
+        pauseBtn.style.display = 'flex';
+        
+        Sound.start();
+        
+        // Ensure we don't start a duplicate loop
+        if (!isLoopRunning) {
+            loop();
+        }
+    }
+
+    // Bind Events Safely
+    document.getElementById('startBtn').addEventListener('click', () => {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        resetGame();
+    });
+    
+    document.getElementById('restartBtn_GO').addEventListener('click', resetGame);
+    document.getElementById('restartBtn_Pause').addEventListener('click', resetGame);
+    
+    function handleTogglePause() {
+         if (gameState === 'GAMEOVER' || gameState === 'START') return;
+
+        if (gameState === 'PLAY') {
+            gameState = 'PAUSED';
+            pauseScreen.classList.add('active');
+            pauseBtn.style.display = 'none'; 
+            Sound.stopBGM();
+        } else if (gameState === 'PAUSED') {
+            gameState = 'PLAY';
+            pauseScreen.classList.remove('active');
+            pauseBtn.style.display = 'flex';
+            Sound.startBGM();
+            // Loop is likely still 'active' in recursion, but let's ensure
+            if (!isLoopRunning) loop();
+        }
+    }
+    
+    document.getElementById('pauseBtn').addEventListener('click', handleTogglePause);
+    document.getElementById('resumeBtn').addEventListener('click', handleTogglePause);
+    
+    // Global exposure just in case
+    window.togglePause = handleTogglePause;
+    
+
+
+    function handleCustomMusic(input) {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                Sound.setCustomBgm(e.target.result);
+                // Visual feedback
+                const label = document.querySelector('label[for="bgmInput"]');
+                label.innerText = "Music Loaded! ▶️";
+                label.style.borderColor = "#0f0";
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    }
+
+    function handleCustomCrash(input) {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                Sound.setCustomCrash(e.target.result);
+                // Visual feedback
+                const label = document.querySelector('label[for="crashInput"]');
+                label.innerText = "Crash Loaded! 💥";
+                label.style.borderColor = "#0f0";
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    }
+
+
+
+    function update() {
+        stars.forEach(star => {
+            star.x -= star.speed; 
+            if(star.x < 0) star.x = canvas.width;
+        });
+
+        traffic.update();
+        player.update();
+
+        spawnObstacle();
+        obstacles.forEach((obs, index) => {
+            obs.update();
+            if (obs.markedForDeletion) obstacles.splice(index, 1);
+
+            if (
+                player.x < obs.x + obs.width &&
+                player.x + player.width > obs.x &&
+                player.y < obs.y + obs.height &&
+                player.y + player.height > obs.y
+            ) {
+                gameOver();
+            }
+        });
+
+        // Spawn Orbs
+        if (frame % ORB_SPAWN_RATE === 0 && Math.random() > 0.3) {
+            let orbY = GROUND_Y - 40 - Math.random() * 100;
+            // Avoid spawning inside obstacle
+            orbs.push(new Orb(canvas.width, orbY));
+        }
+
+        orbs.forEach((orb, index) => {
+            orb.update();
+            if (orb.x < -50) orbs.splice(index, 1);
+            
+            // Collection
+            let dx = (player.x + player.width/2) - orb.x;
+            let dy = (player.y + player.height/2) - orb.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < 40) { // Pickup radius
+                orbs.splice(index, 1);
+                let pointVal = orb.type === 'gold' ? 50 : 10;
+                score += pointVal;
+                Sound.score();
+                createParticles(orb.x, orb.y, 8, orb.type === 'gold' ? '#ff0' : '#0ff');
+                floatTexts.push(new FloatingText(orb.x, orb.y, "+" + pointVal, '#fff'));
+            }
+        });
+
+        floatTexts.forEach((ft, index) => {
+            ft.update();
+            if (ft.life <= 0) floatTexts.splice(index, 1);
+        });
+
+        particles.forEach((p, index) => {
+            p.update();
+            if (p.life <= 0) particles.splice(index, 1);
+        });
+
+        score += 0.1;
+        scoreEl.innerText = Math.floor(score);
+        
+        // EVENT: Level 1 - Speed Mode (Trigger at Score 500 when speed hits ~6.0)
+        if (score > 500 && !speedModeTriggered) {
+             speedModeTriggered = true;
+             floatTexts.push(new FloatingText(canvas.width/2 - 80, 100, "⚡ SPEED MODE ⚡", '#00f3ff'));
+             createParticles(canvas.width/2, 100, 20, '#00f3ff');
+             Sound.playTone(400, 'sawtooth', 0.3, 0.1);
+        }
+        
+        // EVENT: Level 2 - Tint Shift (Hyper Space - Trigger at Score 1000 when speed hits ~7.0)
+        if (score > 1000 && !tintModeTriggered) {
+             tintModeTriggered = true;
+             floatTexts.push(new FloatingText(canvas.width/2 - 100, 100, "🌌 HYPER SPACE 🌌", '#bc13fe'));
+             createParticles(canvas.width/2, 100, 30, '#bc13fe');
+             Sound.playTone(600, 'sawtooth', 0.3, 0.1);
+        }
+
+        // Functional Speed Curve - Ultra Gradual Increase
+        // Base speed 5. Increases by ~1 unit every 500 points (approx 1.5 mins of play)
+        // This ensures the game remains playable for longer and speeds up very slowly.
+        gameSpeed = 5 + (score * 0.002);
+    }
+
+    function draw() {
+        // Safety Check: Ensure core objects exist
+        if (!player || !traffic) return;
+
+        ctx.save();
+        if (screenShake > 0) {
+            let sx = (Math.random() - 0.5) * screenShake;
+            let sy = (Math.random() - 0.5) * screenShake;
+            ctx.translate(sx, sy);
+            screenShake *= 0.9;
+            if(screenShake < 0.5) screenShake = 0;
+        }
+
+        // Dynamic Background Tint
+        if (score > 200) {
+             ctx.fillStyle = '#1a051a'; // Dark Purple/Red Tint
+        } else {
+             ctx.fillStyle = '#0a0a12'; // Original Dark Blue
+        }
+        ctx.fillRect(-10, -10, canvas.width+20, canvas.height+20); 
+
+        ctx.fillStyle = '#ffffff';
+        stars.forEach(star => {
+            ctx.globalAlpha = Math.random() * 0.5 + 0.3;
+            ctx.fillRect(star.x, star.y, star.size, star.size);
+        });
+        ctx.globalAlpha = 1;
+        
+        traffic.draw();
+        
+
+
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00f3ff';
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, GROUND_Y);
+        ctx.lineTo(canvas.width, GROUND_Y);
+        ctx.stroke();
+
+        let gridOffset = (frame * gameSpeed) % 50;
+        ctx.globalAlpha = 0.3;
+        for(let i = -gridOffset; i < canvas.width; i += 50) {
+            ctx.beginPath();
+            ctx.moveTo(i, GROUND_Y);
+            ctx.lineTo(i - 20, canvas.height); 
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+
+        player.draw();
+        orbs.forEach(o => o.draw());
+        obstacles.forEach(obs => obs.draw());
+        floatTexts.forEach(ft => ft.draw());
+        particles.forEach(p => p.draw());
+        
+        ctx.restore(); // End Screen Shake
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        createParticles(player.x + player.width/2, player.y + player.height/2, 50, '#ff0000');
+        Sound.crash();
+        Sound.stopBGM();
+        
+        let isNewRecord = false;
+        if (Math.floor(score) > highScore) {
+            highScore = Math.floor(score);
+            localStorage.setItem('neonRunnerHighScore', highScore);
+            uiHighScoreEl.innerText = highScore;
+            isNewRecord = true;
+        }
+        
+        finalScoreEl.innerText = Math.floor(score);
+        newRecordMsg.style.display = isNewRecord ? 'block' : 'none';
+        
+        if (isNewRecord) {
+             Sound.playTone(800, 'square', 0.2, 0.2);
+             setTimeout(() => Sound.playTone(1000, 'square', 0.4, 0.2), 200);
+        }
+
+        gameOverScreen.classList.add('active');
+        pauseBtn.style.display = 'none';
+    }
+
+    function loop() {
+        isLoopRunning = true;
+        if (gameState === 'PLAY') {
+            update();
+            draw();
+            frame++;
+            requestAnimationFrame(loop);
+        } else if (gameState === 'GAMEOVER') {
+            draw(); 
+            particles.forEach((p, index) => {
+                p.update();
+                if (p.life <= 0) particles.splice(index, 1);
+            });
+            particles.forEach(p => p.draw());
+            
+            if (particles.length > 0) {
+                requestAnimationFrame(loop);
+            } else {
+                isLoopRunning = false; // Loop stopped
+            }
+        } else {
+             // Paused or Start info, don't loop update, just draw once or stop
+             isLoopRunning = false;
+        }
+    }
+    
+    // Initial draw
+    if (gameState === 'START') draw();
+
+</script>
+</body>
+</html>
